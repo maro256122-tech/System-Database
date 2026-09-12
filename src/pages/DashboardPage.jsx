@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useDashboardData } from '../hooks/useDashboard'
 import { supabase } from '../lib/supabase'
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 
@@ -182,7 +182,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── KPI Grid ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <KpiCard
           icon="👥" label="إجمالي العملاء" value={data.totalLeads}
           color="#2563eb" bg="#eff6ff"
@@ -192,16 +192,25 @@ export default function DashboardPage() {
           color="#16a34a" bg="#f0fdf4"
         />
         <KpiCard
+          icon="❌" label="صفقات خسرناها" value={data.closedLost}
+          color="#dc2626" bg="#fef2f2"
+        />
+        <KpiCard
+          icon="🔄" label="عملاء نشطون" value={data.activeLeads}
+          color="#0284c7" bg="#f0f9ff"
+        />
+        <KpiCard
           icon="📈" label="معدل التحويل" value={`${data.cvr}%`}
           color="#7c3aed" bg="#f5f3ff"
         />
         <KpiCard
-          icon="🔄" label="قيد المتابعة" value={data.totalLeads - data.closedWon - data.closedLost}
-          color="#0284c7" bg="#f0f9ff"
+          icon="⏱️" label="متوسط أيام الإغلاق" value={data.avgDaysToClose > 0 ? `${data.avgDaysToClose} يوم` : '—'}
+          color="#0d9488" bg="#f0fdfa"
+          trendLabel="من تسجيل العميل حتى البيع"
         />
         <KpiCard
           icon="⚠️" label="متأخرة المتابعة" value={data.overdue}
-          color="#dc2626" bg="#fef2f2"
+          color="#d97706" bg="#fffbeb"
           trendLabel={data.overdue > 0 ? 'تتطلب اتصالاً فورياً' : 'لا متأخرات'}
         />
       </div>
@@ -209,24 +218,36 @@ export default function DashboardPage() {
       {/* ── Charts ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-        {/* Row 1: Trend + Funnel */}
+        {/* Row 1: Monthly Trend + Funnel */}
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '20px' }}>
 
-          {/* Weekly Trend */}
+          {/* Monthly Trend */}
           <div className="card">
-            <SectionTitle icon="📈" title="الاتجاه الأسبوعي" />
+            <SectionTitle icon="📈" title="الاتجاه الشهري — آخر 6 أشهر" />
             <ResponsiveContainer width="100%" height={230}>
-              <LineChart data={data.trendData} margin={{ top: 4, right: 12, left: -20, bottom: 0 }}>
+              <AreaChart data={data.monthlyData} margin={{ top: 4, right: 12, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradTotal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={PALETTE.blue} stopOpacity={0.18} />
+                    <stop offset="95%" stopColor={PALETTE.blue} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradWon" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={PALETTE.green} stopOpacity={0.18} />
+                    <stop offset="95%" stopColor={PALETTE.green} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="week" tick={{ fontSize: 11, fontFamily: 'Cairo', fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fontFamily: 'Cairo', fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fontFamily: 'Cairo', fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<ChartTooltip />} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', fontFamily: 'Cairo' }} />
-                <Line type="monotone" dataKey="total" name="إجمالي العملاء" stroke={PALETTE.blue}
-                  strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
-                <Line type="monotone" dataKey="won" name="تم البيع" stroke={PALETTE.green}
-                  strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
-              </LineChart>
+                <Area type="monotone" dataKey="total" name="إجمالي العملاء" stroke={PALETTE.blue}
+                  strokeWidth={2.5} fill="url(#gradTotal)" dot={{ r: 3, fill: PALETTE.blue }} activeDot={{ r: 5 }} />
+                <Area type="monotone" dataKey="won" name="تم البيع" stroke={PALETTE.green}
+                  strokeWidth={2.5} fill="url(#gradWon)" dot={{ r: 3, fill: PALETTE.green }} activeDot={{ r: 5 }} />
+                <Area type="monotone" dataKey="lost" name="تم الخسارة" stroke={PALETTE.red}
+                  strokeWidth={2} fill="none" strokeDasharray="4 3" dot={false} activeDot={{ r: 4 }} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
 
@@ -416,6 +437,90 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="empty-state"><div className="empty-state-icon">📭</div><div className="empty-state-text">لا توجد بيانات</div></div>
+            )}
+          </div>
+        </div>
+
+        {/* Row 4: Win/Loss Rate + Weekly Sparkline + Overdue Table */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
+
+          {/* Win / Loss Donut */}
+          <div className="card">
+            <SectionTitle icon="🏆" title="نتائج الصفقات" />
+            {(data.closedWon + data.closedLost) > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={150}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'تم البيع', value: data.closedWon },
+                        { name: 'تم الخسارة', value: data.closedLost },
+                      ]}
+                      dataKey="value" nameKey="name"
+                      cx="50%" cy="50%" innerRadius={40} outerRadius={60}
+                      paddingAngle={4}
+                    >
+                      <Cell fill={PALETTE.green} />
+                      <Cell fill={PALETTE.red} />
+                    </Pie>
+                    <Tooltip content={<ChartTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '8px' }}>
+                  {[
+                    { label: 'تم البيع', value: data.closedWon, color: PALETTE.green },
+                    { label: 'خسرناها', value: data.closedLost, color: PALETTE.red },
+                  ].map((d, i) => (
+                    <div key={i} style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '20px', fontWeight: '800', color: d.color }}>{d.value}</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>{d.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="empty-state"><div className="empty-state-icon">📭</div><div className="empty-state-text">لا توجد صفقات مكتملة</div></div>
+            )}
+          </div>
+
+          {/* Overdue Leads Table */}
+          <div className="card">
+            <SectionTitle icon="🚨" title="العملاء المتأخرة متابعتهم" />
+            {data.overdueLeads.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">✅</div>
+                <div className="empty-state-text">ممتاز! لا يوجد عملاء متأخرة</div>
+              </div>
+            ) : (
+              <div className="table-container" style={{ boxShadow: 'none', border: '1px solid #fecaca' }}>
+                <table>
+                  <thead>
+                    <tr style={{ background: '#fef2f2' }}>
+                      <th>العميل</th>
+                      <th>المرحلة</th>
+                      <th style={{ textAlign: 'center' }}>آخر نشاط</th>
+                      <th>الفرع</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.overdueLeads.map((l, i) => {
+                      const days = Math.floor((Date.now() - new Date(l.updated_at)) / 86400000)
+                      return (
+                        <tr key={l.id}>
+                          <td style={{ fontWeight: '700' }}>{l.customer_name}</td>
+                          <td>
+                            <span style={{ fontSize: '11px', background: '#fef2f2', color: '#dc2626', borderRadius: '20px', padding: '2px 10px', fontWeight: '700' }}>
+                              {l.stage}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center', color: '#dc2626', fontWeight: '700' }}>{days} يوم</td>
+                          <td style={{ fontSize: '12px', color: '#64748b' }}>{l.branches?.name || '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>

@@ -16,7 +16,7 @@ export default function BranchesPage() {
     try {
       const { data } = await supabase
         .from('branches')
-        .select('*, owner:user_profiles!owner_user_id(id, name)')
+        .select('id, name, created_at, owner_user_id')
         .order('name')
       setBranches(data || [])
 
@@ -65,10 +65,7 @@ export default function BranchesPage() {
                 </div>
                 <div>
                   <div style={{ fontWeight: '700', fontSize: '15px' }}>{branch.name}</div>
-                  {branch.owner?.name && (
-                    <div style={{ fontSize: '12px', color: '#64748b' }}>مالك: {branch.owner.name}</div>
-                  )}
-                </div>
+                  </div>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <div style={{ flex: 1, background: '#f8fafc', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>

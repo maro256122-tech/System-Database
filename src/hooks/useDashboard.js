@@ -123,11 +123,33 @@ export function useDashboardData(filters = {}) {
       // Weekly trend (last 8 weeks)
       const trendData = buildWeeklyTrend(leads)
 
+      // Monthly trend (last 6 months)
+      const monthlyData = buildMonthlyTrend(leads)
+
+      // Active leads (not closed)
+      const activeLeads = leads.filter(l => !['closed_won', 'closed_lost'].includes(l.stage)).length
+
+      // Avg days to close (won leads only)
+      const wonLeads = leads.filter(l => l.stage === 'closed_won')
+      const avgDaysToClose = wonLeads.length > 0
+        ? Math.round(wonLeads.reduce((sum, l) => {
+            return sum + differenceInDays(new Date(l.updated_at), new Date(l.created_at))
+          }, 0) / wonLeads.length)
+        : 0
+
+      // Stage velocity (count per stage for active leads)
+      const activeStageMap = {}
+      leads.filter(l => !['closed_won', 'closed_lost'].includes(l.stage)).forEach(l => {
+        activeStageMap[l.stage] = (activeStageMap[l.stage] || 0) + 1
+      })
+
       setData({
         totalLeads,
         closedWon,
         closedLost,
         cvr,
+        activeLeads,
+        avgDaysToClose,
         overdue: overdue.length,
         overdueLeads: overdue.slice(0, 10),
         funnelData,
@@ -137,6 +159,7 @@ export function useDashboardData(filters = {}) {
         paymentData,
         sourceData,
         trendData,
+        monthlyData,
       })
     } catch (err) {
       console.error('Dashboard error:', err)
@@ -151,6 +174,26 @@ export function useDashboardData(filters = {}) {
   }, [fetchData])
 
   return { data, loading, refetch: fetchData }
+}
+
+function buildMonthlyTrend(leads) {
+  const months = []
+  const now = new Date()
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
+    const monthLeads = leads.filter(l => {
+      const c = new Date(l.created_at)
+      return c >= d && c <= end
+    })
+    months.push({
+      month: d.toLocaleDateString('ar-SA', { month: 'short', year: '2-digit' }),
+      total: monthLeads.length,
+      won: monthLeads.filter(l => l.stage === 'closed_won').length,
+      lost: monthLeads.filter(l => l.stage === 'closed_lost').length,
+    })
+  }
+  return months
 }
 
 function buildWeeklyTrend(leads) {
@@ -180,8 +223,10 @@ function buildWeeklyTrend(leads) {
 function getEmptyData() {
   return {
     totalLeads: 0, closedWon: 0, closedLost: 0, cvr: 0,
+    activeLeads: 0, avgDaysToClose: 0,
     overdue: 0, overdueLeads: [],
     funnelData: [], branchPerformance: [], repLeaderboard: [],
-    carModelData: [], paymentData: [], sourceData: [], trendData: [],
+    carModelData: [], paymentData: [], sourceData: [],
+    trendData: [], monthlyData: [],
   }
 }
