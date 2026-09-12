@@ -98,7 +98,7 @@ export default function LeadsPage() {
             </button>
           </div>
 
-          {isRep && (
+          {(isRep || isBranchOwner) && (
             <button className="btn-primary" onClick={() => setShowAddModal(true)}>
               ➕ عميل جديد
             </button>
