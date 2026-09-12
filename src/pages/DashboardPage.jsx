@@ -4,27 +4,84 @@ import { useDashboardData } from '../hooks/useDashboard'
 import { supabase } from '../lib/supabase'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  FunnelChart, Funnel, LabelList, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 
-const CHART_COLORS = ['#2563eb', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#10b981']
+// ── Palette ──────────────────────────────────────────────────────
+const PALETTE = {
+  blue:   '#2563eb',
+  green:  '#16a34a',
+  red:    '#dc2626',
+  amber:  '#d97706',
+  purple: '#7c3aed',
+  cyan:   '#0284c7',
+  pink:   '#db2777',
+  teal:   '#0d9488',
+}
+const PIE_COLORS = Object.values(PALETTE)
 
-function StatCard({ icon, label, value, sub, color = '#2563eb', highlight = false }) {
+// ── Custom Tooltip ────────────────────────────────────────────────
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
   return (
-    <div className="stat-card" style={highlight ? { border: '2px solid #ef4444', background: '#fef2f2' } : {}}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '24px' }}>{icon}</span>
-        {sub && <span style={{ fontSize: '12px', color: '#94a3b8' }}>{sub}</span>}
-      </div>
-      <div className="stat-value" style={{ color }}>{value}</div>
-      <div className="stat-label">{label}</div>
+    <div style={{
+      background: 'white', border: '1px solid #e2e8f0', borderRadius: '10px',
+      padding: '10px 14px', fontSize: '12px', direction: 'rtl',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+    }}>
+      {label && <div style={{ fontWeight: '700', marginBottom: '6px', color: '#0f172a' }}>{label}</div>}
+      {payload.map((p, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: p.color }} />
+          <span style={{ color: '#64748b' }}>{p.name}:</span>
+          <span style={{ fontWeight: '700', color: '#0f172a' }}>{p.value}</span>
+        </div>
+      ))}
     </div>
   )
 }
 
+// ── KPI Card ──────────────────────────────────────────────────────
+function KpiCard({ icon, label, value, color, bg, trend, trendLabel, trendUp }) {
+  return (
+    <div className="stat-card" style={{ '--kpi-color': color, '--kpi-bg': bg }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div className="stat-icon-box" style={{ background: bg }}>
+          <span style={{ fontSize: '22px' }}>{icon}</span>
+        </div>
+        {trend !== undefined && (
+          <span style={{
+            fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '20px',
+            background: trendUp ? '#f0fdf4' : '#fef2f2',
+            color: trendUp ? '#16a34a' : '#dc2626',
+          }}>
+            {trendUp ? '↑' : '↓'} {trend}%
+          </span>
+        )}
+      </div>
+      <div className="stat-value">{value}</div>
+      <div className="stat-label">{label}</div>
+      {trendLabel && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>{trendLabel}</div>}
+    </div>
+  )
+}
+
+// ── Section Header ────────────────────────────────────────────────
+function SectionTitle({ icon, title, action }) {
+  return (
+    <div className="card-header">
+      <div className="card-title">
+        <div className="card-title-icon" style={{ background: '#eff6ff' }}>{icon}</div>
+        {title}
+      </div>
+      {action}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════
 export default function DashboardPage() {
-  const { isHelicopter, branchId } = useAuth()
+  const { isHelicopter, branchId, profile } = useAuth()
   const [branches, setBranches] = useState([])
   const [filters, setFilters] = useState({
     branchId: isHelicopter ? '' : branchId,
@@ -43,9 +100,9 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '80px', color: '#94a3b8' }}>
-        <div style={{ fontSize: '40px', marginBottom: '16px' }}>📊</div>
-        <p style={{ fontSize: '16px' }}>جاري تحميل البيانات...</p>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '16px' }}>
+        <div className="spinner" />
+        <p style={{ color: '#64748b', fontSize: '14px', fontWeight: '600' }}>جاري تحميل البيانات...</p>
       </div>
     )
   }
@@ -54,177 +111,221 @@ export default function DashboardPage() {
 
   return (
     <div>
-      {/* Header */}
+      {/* ── Page Header ── */}
       <div className="page-header">
-        <h1 className="page-title">
-          {isHelicopter ? '🚁 لوحة التحكم الرئيسية' : '📊 لوحة الفرع'}
-        </h1>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="page-title">
+            {isHelicopter ? 'لوحة التحكم الرئيسية' : 'لوحة الفرع'}
+          </h1>
+          <div className="page-subtitle">
+            {isHelicopter
+              ? `إجمالي ${data.totalLeads} عميل عبر ${branches.length || '11'} فرع`
+              : `إجمالي ${data.totalLeads} عميل في فرعك`
+            }
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
           {isHelicopter && (
             <select
               value={filters.branchId}
               onChange={e => setFilters(f => ({ ...f, branchId: e.target.value }))}
-              style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '7px 12px', fontFamily: 'inherit', fontSize: '13px', direction: 'rtl' }}
+              style={{ border: '1.5px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px', fontFamily: 'Cairo,sans-serif', fontSize: '13px', direction: 'rtl', background: 'white', color: '#334155' }}
             >
               <option value="">كل الفروع</option>
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           )}
-          <input
-            type="date"
-            value={filters.dateFrom}
+          <input type="date" value={filters.dateFrom} dir="ltr" title="من تاريخ"
             onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))}
-            style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '7px 12px', fontFamily: 'inherit', fontSize: '13px' }}
-            dir="ltr"
-            title="من تاريخ"
+            style={{ border: '1.5px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px', fontFamily: 'Cairo,sans-serif', fontSize: '13px', color: '#334155', background: 'white' }}
           />
-          <input
-            type="date"
-            value={filters.dateTo}
+          <input type="date" value={filters.dateTo} dir="ltr" title="إلى تاريخ"
             onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))}
-            style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '7px 12px', fontFamily: 'inherit', fontSize: '13px' }}
-            dir="ltr"
-            title="إلى تاريخ"
+            style={{ border: '1.5px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px', fontFamily: 'Cairo,sans-serif', fontSize: '13px', color: '#334155', background: 'white' }}
           />
+          {(filters.dateFrom || filters.dateTo || (isHelicopter && filters.branchId)) && (
+            <button className="btn-ghost"
+              onClick={() => setFilters({ branchId: isHelicopter ? '' : branchId, dateFrom: '', dateTo: '' })}>
+              × إعادة تعيين
+            </button>
+          )}
         </div>
       </div>
 
-      {/* KPI Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px', marginBottom: '24px' }}>
-        <StatCard icon="👥" label="إجمالي العملاء" value={data.totalLeads} />
-        <StatCard icon="✅" label="تم البيع" value={data.closedWon} color="#22c55e" />
-        <StatCard icon="❌" label="فقد" value={data.closedLost} color="#ef4444" />
-        <StatCard icon="📈" label="معدل التحويل" value={`${data.cvr}%`} color="#2563eb" />
-        <StatCard
-          icon="⚠️"
-          label="متأخرة المتابعة"
-          value={data.overdue}
-          color="#ef4444"
-          highlight={data.overdue > 0}
-        />
-      </div>
-
-      {/* Overdue leads alert */}
+      {/* ── Overdue Alert ── */}
       {data.overdueLeads.length > 0 && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
-          <div style={{ fontWeight: '700', color: '#dc2626', marginBottom: '10px' }}>
-            ⚠️ عملاء تجاوزوا 3 أيام بدون متابعة
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {data.overdueLeads.map(l => (
-              <span key={l.id} style={{ background: 'white', border: '1px solid #fecaca', borderRadius: '8px', padding: '4px 10px', fontSize: '13px', color: '#dc2626' }}>
-                {l.customer_name}
-              </span>
-            ))}
+        <div style={{
+          background: '#fef2f2', border: '1px solid #fecaca', borderRight: '4px solid #dc2626',
+          borderRadius: '12px', padding: '14px 18px', marginBottom: '24px',
+          display: 'flex', alignItems: 'flex-start', gap: '12px',
+        }}>
+          <span style={{ fontSize: '20px', flexShrink: 0 }}>⚠️</span>
+          <div>
+            <div style={{ fontWeight: '800', color: '#dc2626', fontSize: '13px', marginBottom: '8px' }}>
+              {data.overdueLeads.length} عميل تجاوزوا 3 أيام بدون متابعة
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {data.overdueLeads.map(l => (
+                <span key={l.id} style={{
+                  background: 'white', border: '1px solid #fecaca',
+                  borderRadius: '20px', padding: '3px 12px', fontSize: '12px',
+                  color: '#dc2626', fontWeight: '600',
+                }}>
+                  {l.customer_name}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Charts Grid */}
-      <div style={{ display: 'grid', gap: '20px' }}>
+      {/* ── KPI Grid ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <KpiCard
+          icon="👥" label="إجمالي العملاء" value={data.totalLeads}
+          color="#2563eb" bg="#eff6ff"
+        />
+        <KpiCard
+          icon="✅" label="صفقات ناجحة" value={data.closedWon}
+          color="#16a34a" bg="#f0fdf4"
+        />
+        <KpiCard
+          icon="📈" label="معدل التحويل" value={`${data.cvr}%`}
+          color="#7c3aed" bg="#f5f3ff"
+        />
+        <KpiCard
+          icon="🔄" label="قيد المتابعة" value={data.totalLeads - data.closedWon - data.closedLost}
+          color="#0284c7" bg="#f0f9ff"
+        />
+        <KpiCard
+          icon="⚠️" label="متأخرة المتابعة" value={data.overdue}
+          color="#dc2626" bg="#fef2f2"
+          trendLabel={data.overdue > 0 ? 'تتطلب اتصالاً فورياً' : 'لا متأخرات'}
+        />
+      </div>
+
+      {/* ── Charts ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
         {/* Row 1: Trend + Funnel */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '20px' }}>
+
           {/* Weekly Trend */}
           <div className="card">
-            <h3 style={{ fontWeight: '700', marginBottom: '16px', fontSize: '15px' }}>📈 الاتجاه الأسبوعي</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={data.trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="total" name="إجمالي" stroke="#2563eb" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="won" name="تم البيع" stroke="#22c55e" strokeWidth={2} dot={false} />
+            <SectionTitle icon="📈" title="الاتجاه الأسبوعي" />
+            <ResponsiveContainer width="100%" height={230}>
+              <LineChart data={data.trendData} margin={{ top: 4, right: 12, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="week" tick={{ fontSize: 11, fontFamily: 'Cairo', fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fontFamily: 'Cairo', fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip />} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', fontFamily: 'Cairo' }} />
+                <Line type="monotone" dataKey="total" name="إجمالي العملاء" stroke={PALETTE.blue}
+                  strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey="won" name="تم البيع" stroke={PALETTE.green}
+                  strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
           {/* Funnel */}
           <div className="card">
-            <h3 style={{ fontWeight: '700', marginBottom: '16px', fontSize: '15px' }}>🏆 مسار المبيعات</h3>
+            <SectionTitle icon="🔻" title="مسار البيع" />
             <div style={{ direction: 'ltr' }}>
-              {data.funnelData.filter(f => f.count > 0).map((f, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', minWidth: '80px', textAlign: 'right', direction: 'rtl' }}>
-                    {f.stage}
-                  </div>
-                  <div style={{ flex: 1, background: '#f1f5f9', borderRadius: '4px', height: '22px', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      background: f.color,
-                      width: `${data.funnelData[0]?.count ? (f.count / data.funnelData[0].count) * 100 : 0}%`,
-                      borderRadius: '4px',
-                      transition: 'width 0.5s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'flex-end',
-                      paddingRight: '6px',
-                    }}>
-                      <span style={{ color: 'white', fontSize: '11px', fontWeight: '700' }}>{f.count}</span>
-                    </div>
-                  </div>
+              {data.funnelData.filter(f => f.count > 0).length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-state-icon">📭</div>
+                  <div className="empty-state-text">لا توجد بيانات</div>
                 </div>
-              ))}
-              {data.funnelData.filter(f => f.count > 0).length === 0 && (
-                <p style={{ color: '#94a3b8', textAlign: 'center', padding: '20px', direction: 'rtl' }}>لا توجد بيانات</p>
+              ) : (
+                data.funnelData.filter(f => f.count > 0).map((f, i) => {
+                  const pct = data.funnelData[0]?.count
+                    ? Math.round((f.count / data.funnelData[0].count) * 100) : 0
+                  return (
+                    <div key={i} style={{ marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', direction: 'rtl' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#334155' }}>{f.stage}</span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
+                          {f.count} · {pct}%
+                        </span>
+                      </div>
+                      <div style={{ background: '#f1f5f9', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', background: f.color || PALETTE.blue,
+                          width: `${pct}%`, borderRadius: '4px',
+                          transition: 'width 0.6s ease',
+                        }} />
+                      </div>
+                    </div>
+                  )
+                })
               )}
             </div>
           </div>
         </div>
 
-        {/* Row 2: Branch Performance + Rep Leaderboard */}
+        {/* Row 2: Branch Performance + Rep Leaderboard (helicopter only) */}
         {isHelicopter && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            {/* Branch performance */}
+            {/* Branch chart */}
             <div className="card">
-              <h3 style={{ fontWeight: '700', marginBottom: '16px', fontSize: '15px' }}>🏢 أداء الفروع</h3>
+              <SectionTitle icon="🏢" title="أداء الفروع" />
               {data.branchPerformance.length > 0 ? (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={data.branchPerformance} layout="vertical">
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={data.branchPerformance} layout="vertical" margin={{ top: 0, right: 24, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
-                    <Tooltip />
-                    <Bar dataKey="won" name="تم البيع" fill="#22c55e" radius={[0, 4, 4, 0]} />
-                    <Bar dataKey="total" name="إجمالي" fill="#2563eb22" radius={[0, 4, 4, 0]} />
+                    <XAxis type="number" tick={{ fontSize: 11, fontFamily: 'Cairo', fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fontFamily: 'Cairo', fill: '#334155' }} width={90} axisLine={false} tickLine={false} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', fontFamily: 'Cairo' }} />
+                    <Bar dataKey="total" name="إجمالي" fill="#bfdbfe" radius={[0, 4, 4, 0]} barSize={12} />
+                    <Bar dataKey="won" name="تم البيع" fill={PALETTE.green} radius={[0, 4, 4, 0]} barSize={12} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <p style={{ color: '#94a3b8', textAlign: 'center', padding: '30px' }}>لا توجد بيانات</p>
+                <div className="empty-state"><div className="empty-state-icon">📭</div><div className="empty-state-text">لا توجد بيانات</div></div>
               )}
             </div>
 
-            {/* Rep leaderboard */}
+            {/* Rep Leaderboard */}
             <div className="card">
-              <h3 style={{ fontWeight: '700', marginBottom: '16px', fontSize: '15px' }}>🏅 المندوبين</h3>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <SectionTitle icon="🏅" title="أداء المندوبين" />
+              <div className="table-container" style={{ boxShadow: 'none', border: '1px solid #f1f5f9' }}>
+                <table>
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'right', padding: '8px', fontSize: '12px', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>المندوب</th>
-                      <th style={{ textAlign: 'center', padding: '8px', fontSize: '12px', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>إجمالي</th>
-                      <th style={{ textAlign: 'center', padding: '8px', fontSize: '12px', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>بيع</th>
-                      <th style={{ textAlign: 'center', padding: '8px', fontSize: '12px', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>CVR</th>
+                      <th>#</th>
+                      <th>المندوب</th>
+                      <th style={{ textAlign: 'center' }}>إجمالي</th>
+                      <th style={{ textAlign: 'center' }}>بيع</th>
+                      <th style={{ textAlign: 'center' }}>CVR</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.repLeaderboard.slice(0, 8).map((r, i) => (
-                      <tr key={i}>
-                        <td style={{ padding: '8px', fontSize: '13px', borderBottom: '1px solid #f8fafc' }}>
-                          <span style={{ marginLeft: '6px' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}</span>
-                          {r.name}
-                        </td>
-                        <td style={{ padding: '8px', textAlign: 'center', fontSize: '13px', borderBottom: '1px solid #f8fafc' }}>{r.total}</td>
-                        <td style={{ padding: '8px', textAlign: 'center', fontSize: '13px', color: '#22c55e', fontWeight: '700', borderBottom: '1px solid #f8fafc' }}>{r.won}</td>
-                        <td style={{ padding: '8px', textAlign: 'center', fontSize: '13px', borderBottom: '1px solid #f8fafc' }}>
-                          <span style={{ background: '#f0fdf4', color: '#166534', borderRadius: '12px', padding: '2px 8px' }}>{r.cvr}%</span>
-                        </td>
-                      </tr>
-                    ))}
-                    {data.repLeaderboard.length === 0 && (
-                      <tr><td colSpan={4} style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>لا توجد بيانات</td></tr>
+                    {data.repLeaderboard.length === 0 ? (
+                      <tr><td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: '24px' }}>لا توجد بيانات</td></tr>
+                    ) : (
+                      data.repLeaderboard.slice(0, 7).map((r, i) => (
+                        <tr key={i}>
+                          <td style={{ width: '36px', textAlign: 'center' }}>
+                            {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (
+                              <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '700' }}>{i + 1}</span>
+                            )}
+                          </td>
+                          <td style={{ fontWeight: '600' }}>{r.name}</td>
+                          <td style={{ textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{r.total}</td>
+                          <td style={{ textAlign: 'center', color: PALETTE.green, fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>{r.won}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{
+                              background: r.cvr >= 30 ? '#f0fdf4' : r.cvr >= 15 ? '#fffbeb' : '#fef2f2',
+                              color: r.cvr >= 30 ? PALETTE.green : r.cvr >= 15 ? PALETTE.amber : PALETTE.red,
+                              borderRadius: '20px', padding: '2px 10px', fontSize: '12px', fontWeight: '700',
+                            }}>{r.cvr}%</span>
+                          </td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>
@@ -234,64 +335,87 @@ export default function DashboardPage() {
         )}
 
         {/* Row 3: Car Models + Payment + Source */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-          {/* Car model distribution */}
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '20px' }}>
+
+          {/* Car Models Bar */}
           <div className="card">
-            <h3 style={{ fontWeight: '700', marginBottom: '16px', fontSize: '15px' }}>🚗 الموديلات</h3>
+            <SectionTitle icon="🚗" title="توزيع الموديلات" />
             {data.carModelData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={data.carModelData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Bar dataKey="total" name="عملاء" fill="#2563eb" radius={[4, 4, 0, 0]} />
+              <ResponsiveContainer width="100%" height={210}>
+                <BarChart data={data.carModelData.slice(0, 8)} margin={{ top: 0, right: 8, left: -28, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fontFamily: 'Cairo', fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fontFamily: 'Cairo', fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="total" name="عملاء" fill={PALETTE.blue} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px' }}>لا توجد بيانات</p>
+              <div className="empty-state"><div className="empty-state-icon">📭</div><div className="empty-state-text">لا توجد بيانات</div></div>
             )}
           </div>
 
-          {/* Payment distribution */}
+          {/* Payment Pie */}
           <div className="card">
-            <h3 style={{ fontWeight: '700', marginBottom: '16px', fontSize: '15px' }}>💳 نوع الدفع</h3>
+            <SectionTitle icon="💳" title="نوع الدفع" />
             {data.paymentData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={data.paymentData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, value }) => `${name}: ${value}`} labelLine={false}>
-                    {data.paymentData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <>
+                <ResponsiveContainer width="100%" height={150}>
+                  <PieChart>
+                    <Pie data={data.paymentData} dataKey="value" nameKey="name"
+                      cx="50%" cy="50%" innerRadius={35} outerRadius={60}
+                      paddingAngle={3}>
+                      {data.paymentData.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<ChartTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
+                  {data.paymentData.map((d, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: PIE_COLORS[i % PIE_COLORS.length], flexShrink: 0 }} />
+                        <span style={{ color: '#334155', fontWeight: '600' }}>{d.name}</span>
+                      </div>
+                      <span style={{ fontWeight: '700', color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>{d.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : (
-              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px' }}>لا توجد بيانات</p>
+              <div className="empty-state"><div className="empty-state-icon">📭</div><div className="empty-state-text">لا توجد بيانات</div></div>
             )}
           </div>
 
-          {/* Source breakdown */}
+          {/* Source Breakdown */}
           <div className="card">
-            <h3 style={{ fontWeight: '700', marginBottom: '16px', fontSize: '15px' }}>📱 المصدر</h3>
-            {data.sourceData.map((s, i) => (
-              <div key={i} style={{ marginBottom: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: '600' }}>{s.name}</span>
-                  <span>{s.total} عميل — CVR: {s.cvr}%</span>
-                </div>
-                <div style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${s.total > 0 ? (s.won / s.total) * 100 : 0}%`,
-                    background: CHART_COLORS[i],
-                    borderRadius: '4px',
-                  }} />
-                </div>
-                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{s.won} تم البيع</div>
+            <SectionTitle icon="📡" title="مصدر العملاء" />
+            {data.sourceData.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingTop: '4px' }}>
+                {data.sourceData.map((s, i) => (
+                  <div key={i}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>{s.name}</span>
+                      <span style={{ fontSize: '12px', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>{s.total} عميل</span>
+                    </div>
+                    <div style={{ background: '#f1f5f9', borderRadius: '4px', height: '8px', overflow: 'hidden', marginBottom: '5px' }}>
+                      <div style={{
+                        height: '100%', background: PIE_COLORS[i],
+                        width: `${s.total > 0 ? (s.won / s.total) * 100 : 0}%`,
+                        borderRadius: '4px', transition: 'width 0.6s',
+                      }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8' }}>
+                      <span>{s.won} تم البيع</span>
+                      <span style={{ fontWeight: '700', color: PIE_COLORS[i] }}>CVR {s.cvr}%</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-            {data.sourceData.length === 0 && (
-              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '30px' }}>لا توجد بيانات</p>
+            ) : (
+              <div className="empty-state"><div className="empty-state-icon">📭</div><div className="empty-state-text">لا توجد بيانات</div></div>
             )}
           </div>
         </div>
