@@ -18,8 +18,7 @@ export function useLeads(filters = {}) {
         .select(`
           *,
           branches(id, name),
-          car_models(id, name, category),
-          rep:user_profiles!assigned_rep_id(id, name)
+          car_models(id, name, category)
         `)
         .order('created_at', { ascending: false })
 
@@ -74,14 +73,13 @@ export function useLead(leadId) {
           .select(`
             *,
             branches(id, name),
-            car_models(id, name),
-            rep:user_profiles!assigned_rep_id(id, name)
+            car_models(id, name)
           `)
           .eq('id', leadId)
           .single(),
         supabase
           .from('activities')
-          .select('*, user:user_profiles!user_id(id, name)')
+          .select('*')
           .eq('lead_id', leadId)
           .order('created_at', { ascending: false }),
       ])

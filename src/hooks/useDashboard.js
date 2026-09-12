@@ -18,8 +18,7 @@ export function useDashboardData(filters = {}) {
         .select(`
           *,
           branches(id, name),
-          car_models(id, name),
-          rep:user_profiles!assigned_rep_id(id, name)
+          car_models(id, name)
         `)
 
       if (filters.branchId) query = query.eq('branch_id', filters.branchId)
