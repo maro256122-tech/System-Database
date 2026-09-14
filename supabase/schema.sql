@@ -1,5 +1,5 @@
 -- ============================================================
--- Sky Color CRM — Supabase Schema + RLS Policies
+-- Warcha Pro CRM — Supabase Schema + RLS Policies
 -- ============================================================
 
 -- Enable UUID extension
