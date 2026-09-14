@@ -55,7 +55,7 @@ export default function LoginPage() {
             🚗
           </div>
           <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#1e293b', margin: '0 0 6px' }}>
-            سكاي كلر
+            Warcha Pro
           </h1>
           <p style={{ fontSize: '14px', color: '#64748b' }}>نظام إدارة العملاء — CRM</p>
         </div>
@@ -96,7 +96,7 @@ export default function LoginPage() {
         </form>
 
         <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '12px', color: '#94a3b8' }}>
-          نظام إدارة العملاء الداخلي — سكاي كلر
+          نظام إدارة العملاء الداخلي — Warcha Pro
         </p>
       </div>
     </div>

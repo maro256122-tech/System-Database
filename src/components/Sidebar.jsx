@@ -60,7 +60,7 @@ export default function Sidebar({ activePage, onNavigate }) {
             boxShadow: '0 4px 12px rgba(37,99,235,0.4)',
           }}>🚗</div>
           <div>
-            <div className="sidebar-logo-title">سكاي كلر</div>
+            <div className="sidebar-logo-title">Warcha Pro</div>
             <div className="sidebar-logo-sub">نظام إدارة العملاء</div>
           </div>
         </div>

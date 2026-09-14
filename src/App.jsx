@@ -26,7 +26,7 @@ function AppContent() {
       }}>
         <div style={{ textAlign: 'center', color: 'white' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚗</div>
-          <div style={{ fontSize: '18px', fontWeight: '700' }}>سكاي كلر</div>
+          <div style={{ fontSize: '18px', fontWeight: '700' }}>Warcha Pro</div>
           <div style={{ fontSize: '14px', opacity: 0.8, marginTop: '4px' }}>جاري التحميل...</div>
         </div>
       </div>
