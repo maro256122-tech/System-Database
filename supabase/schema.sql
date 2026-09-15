@@ -54,6 +54,12 @@ CREATE TABLE public.leads (
   customer_name TEXT NOT NULL,
   customer_phone TEXT,
   lost_reason TEXT,
+  deposit_amount NUMERIC(10,2),
+  deposit_date DATE,
+  visit_attended BOOLEAN,
+  contact_responded BOOLEAN,
+  reschedule_date DATE,
+  follow_up_date DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -70,7 +76,11 @@ CREATE TABLE public.activities (
     'contact_attempt',
     'follow_up',
     'whatsapp_message',
-    'call_made'
+    'call_made',
+    'deposit_recorded',
+    'visit_no_show',
+    'contact_no_response',
+    'visit_rescheduled'
   )),
   note TEXT,
   from_stage TEXT,

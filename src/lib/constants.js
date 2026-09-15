@@ -40,6 +40,10 @@ export const ACTION_TYPE_LABELS = {
   follow_up: 'متابعة',
   whatsapp_message: 'رسالة واتساب',
   call_made: 'مكالمة',
+  deposit_recorded: '💰 تسجيل عربون',
+  visit_no_show: '📅 لم يحضر الزيارة',
+  contact_no_response: '📞 لم يرد على التواصل',
+  visit_rescheduled: '🔄 إعادة جدولة الزيارة',
 }
 
 export const ACTION_TYPE_OPTIONS = [

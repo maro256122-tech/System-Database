@@ -7,12 +7,14 @@ const NAV_ITEMS = {
     { icon: '◼', label: 'لوحة التحكم', page: 'dashboard', emoji: '📊' },
     { icon: '◼', label: 'جميع الفروع', page: 'branches', emoji: '🏢' },
     { icon: '◼', label: 'جميع العملاء', page: 'leads', emoji: '📋' },
+    { icon: '◼', label: 'الحسابات', page: 'financial', emoji: '💰' },
     { icon: '◼', label: 'التقارير', page: 'reports', emoji: '📈' },
     { icon: '◼', label: 'الإعدادات', page: 'settings', emoji: '⚙️' },
   ],
   branch_owner: [
     { icon: '◼', label: 'لوحة الفرع', page: 'dashboard', emoji: '📊' },
     { icon: '◼', label: 'عملاء الفرع', page: 'leads', emoji: '📋' },
+    { icon: '◼', label: 'الحسابات', page: 'financial', emoji: '💰' },
     { icon: '◼', label: 'التقارير', page: 'reports', emoji: '📈' },
   ],
   rep: [

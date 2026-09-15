@@ -10,6 +10,7 @@ import BranchesPage from './pages/BranchesPage'
 import SettingsPage from './pages/SettingsPage'
 import OverduePage from './pages/OverduePage'
 import StatsPage from './pages/StatsPage'
+import FinancialPage from './pages/FinancialPage'
 
 function AppContent() {
   const { user, profile, loading } = useAuth()
@@ -52,6 +53,7 @@ function AppContent() {
       case 'settings': return <SettingsPage />
       case 'overdue': return <OverduePage />
       case 'stats': return <StatsPage />
+      case 'financial': return <FinancialPage />
       default: return <DashboardPage />
     }
   }
