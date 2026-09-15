@@ -292,10 +292,10 @@ function RepDashboard() {
 // ══════════════════════════════════════════════════════════════════
 // PIPELINE FUNNEL — أعداد الطلبات في رحلة البيع
 // ══════════════════════════════════════════════════════════════════
-const FUNNEL_SELECT = `*, car_models(id, name), branches(id, name), assigned_rep:user_profiles!assigned_rep_id(id, name)`
+const FUNNEL_SELECT = `*, car_models(id, name), branches(id, name)`
 
 function PipelineFunnel({ isHelicopter, branches = [] }) {
-  const { branchId: userBranchId } = useAuth()
+  const { branchId: userBranchId, loading: authLoading } = useAuth()
 
   const [filters, setFilters] = useState({
     branchId: isHelicopter ? '' : (userBranchId || ''),
@@ -307,15 +307,10 @@ function PipelineFunnel({ isHelicopter, branches = [] }) {
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Extract unique car models and reps from loaded leads
+  // Extract unique car models from loaded leads
   const carModels = [...new Map(
     leads.filter(l => l.car_model_id && l.car_models)
          .map(l => [l.car_model_id, { id: l.car_model_id, name: l.car_models.name }])
-  ).values()]
-
-  const reps = [...new Map(
-    leads.filter(l => l.assigned_rep_id && l.assigned_rep?.name)
-         .map(l => [l.assigned_rep_id, { id: l.assigned_rep_id, name: l.assigned_rep.name }])
   ).values()]
 
   function setFilter(k, v) { setFilters(f => ({ ...f, [k]: v })) }
@@ -323,6 +318,7 @@ function PipelineFunnel({ isHelicopter, branches = [] }) {
 
   // Fetch leads from Supabase with active filters
   useEffect(() => {
+    if (authLoading) return
     async function load() {
       setLoading(true)
       try {
@@ -333,14 +329,15 @@ function PipelineFunnel({ isHelicopter, branches = [] }) {
         if (filters.carModelId) q = q.eq('car_model_id', filters.carModelId)
         if (filters.dateFrom)   q = q.gte('created_at', filters.dateFrom)
         if (filters.dateTo)     q = q.lte('created_at', filters.dateTo + 'T23:59:59')
-        const { data } = await q
+        const { data, error } = await q
+        if (error) console.error('PipelineFunnel query error:', error)
         setLeads(data || [])
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [JSON.stringify(filters), isHelicopter, userBranchId])
+  }, [JSON.stringify(filters), isHelicopter, userBranchId, authLoading])
 
   const totalLeads = leads.length
 
@@ -449,16 +446,6 @@ function PipelineFunnel({ isHelicopter, branches = [] }) {
             </select>
           </div>
 
-          {/* المندوب */}
-          {reps.length > 0 && (
-            <div>
-              <div style={{ fontSize: '10px', fontWeight: '700', color: '#78350f', marginBottom: '4px' }}>👤 المندوب</div>
-              <select value={filters.repId || ''} onChange={e => setFilter('repId', e.target.value)} style={selectStyle}>
-                <option value="">كل المندوبين</option>
-                {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-              </select>
-            </div>
-          )}
         </div>
       </div>
 
