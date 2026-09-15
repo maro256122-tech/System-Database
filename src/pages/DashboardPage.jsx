@@ -4,7 +4,7 @@ import { useDashboardData } from '../hooks/useDashboard'
 import { useLeads } from '../hooks/useLeads'
 import { supabase } from '../lib/supabase'
 import { useEffect } from 'react'
-import { STAGES } from '../lib/constants'
+import { STAGES, ACTIVE_STAGES } from '../lib/constants'
 import AddLeadModal from '../components/AddLeadModal'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -95,7 +95,7 @@ function RepDashboard() {
   const myOverdue= leads.filter(l => l.isOverdue)
   const myCvr    = myTotal > 0 ? ((myWon / myTotal) * 100).toFixed(1) : 0
 
-  const activeStageCounts = STAGES.slice(0, 6).map(s => ({
+  const activeStageCounts = ACTIVE_STAGES.map(s => ({
     label: s.label, icon: s.icon, color: s.color,
     count: leads.filter(l => l.stage === s.key).length,
   }))
@@ -290,6 +290,147 @@ function RepDashboard() {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// PIPELINE FUNNEL — أعداد الطلبات في رحلة البيع
+// ══════════════════════════════════════════════════════════════════
+function PipelineFunnel({ leads, theme }) {
+  const totalLeads = leads.length
+
+  // Cumulative counts: how many leads reached each stage or beyond
+  const PIPELINE_STAGES = [
+    { key: 'lead_in',         label: 'الليدز الجديدة',                  desc: 'إجمالي العملاء المضافين',          color: '#6366f1', bg: '#ede9fe' },
+    { key: 'inquiry_replied', label: 'تم الرد على استفساراتهم',          desc: 'خرجوا من مرحلة "عميل جديد"',       color: '#0ea5e9', bg: '#e0f2fe' },
+    { key: 'visit_booked',    label: 'وصلوا لحجز موعد زيارة',            desc: 'تم تحديد موعد المعاينة',           color: '#14b8a6', bg: '#ccfbf1' },
+    { key: 'deposit_paid',    label: 'وصلوا لحجز بعربون',               desc: 'دفعوا عربوناً للحجز',              color: '#f59e0b', bg: '#fef3c7' },
+    { key: 'closed_won',      label: 'عمليات البيع المدفوعة بالكامل',   desc: 'تمت الصفقة وكمل الدفع',            color: '#22c55e', bg: '#dcfce7' },
+  ]
+
+  // Order reflects pipeline progression — count leads AT or PAST each stage
+  const stageOrder = ['lead_in', 'contacted', 'inquiry_replied', 'visit_booked', 'deposit_paid', 'closed_won']
+  function countFromStage(stageKey) {
+    const idx = stageOrder.indexOf(stageKey)
+    if (idx === -1) return leads.filter(l => l.stage === stageKey).length
+    const validKeys = stageOrder.slice(idx)
+    return leads.filter(l => validKeys.includes(l.stage) || l.stage === 'closed_won').length
+  }
+
+  const rows = PIPELINE_STAGES.map((s, i) => {
+    const count = countFromStage(s.key)
+    const pct = totalLeads > 0 ? Math.round((count / totalLeads) * 100) : 0
+    return { ...s, count, pct, step: i + 1 }
+  })
+
+  // Financial conversion rates
+  const visitCount   = rows[2].count
+  const depositCount = rows[3].count
+  const wonCount     = rows[4].count
+  const visitCvr   = totalLeads > 0 ? ((visitCount / totalLeads) * 100).toFixed(1) : 0
+  const depositCvr = totalLeads > 0 ? ((depositCount / totalLeads) * 100).toFixed(1) : 0
+  const salesCvr   = totalLeads > 0 ? ((wonCount / totalLeads) * 100).toFixed(1) : 0
+
+  return (
+    <div className="card" style={{ padding: '24px' }}>
+      <div className="card-header" style={{ marginBottom: '20px' }}>
+        <div className="card-title">
+          <div className="card-title-icon" style={{ background: '#ede9fe' }}>🔻</div>
+          أعداد الطلبات في رحلة البيع
+        </div>
+        <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+          إجمالي {totalLeads} عميل
+        </div>
+      </div>
+
+      {/* Funnel steps */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+        {rows.map((row, i) => {
+          const width = totalLeads > 0 ? Math.max(20, Math.round((row.count / rows[0].count) * 100)) : 20
+          return (
+            <div key={row.key} style={{ position: 'relative' }}>
+              {/* Step bar */}
+              <div style={{
+                background: '#f8fafc',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                border: `1px solid ${row.color}30`,
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: `linear-gradient(to left, ${row.bg} ${width}%, white ${width}%)`,
+                  transition: 'background 0.6s ease',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '28px', height: '28px',
+                      borderRadius: '50%',
+                      background: row.color,
+                      color: 'white',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '12px', fontWeight: '800',
+                      flexShrink: 0,
+                    }}>{row.step}</div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>{row.label}</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '1px' }}>{row.desc}</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'left', flexShrink: 0 }}>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: row.color, lineHeight: 1 }}>{row.count}</div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'center' }}>{row.pct}%</div>
+                  </div>
+                </div>
+              </div>
+              {/* Arrow connector */}
+              {i < rows.length - 1 && (
+                <div style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '14px', lineHeight: '14px', marginTop: '2px' }}>▼</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Financial KPIs + Filters hint */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+        {/* الأداء المالي والتحويل */}
+        <div style={{ background: '#f0f9ff', borderRadius: '12px', padding: '16px', border: '1px solid #bae6fd' }}>
+          <div style={{ fontSize: '12px', fontWeight: '800', color: '#0284c7', marginBottom: '12px' }}>
+            📊 الأداء المالي والتحويل
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[
+              { label: 'نسبة التحويل إلى حجز زيارة', value: `${visitCvr}%`, color: '#14b8a6' },
+              { label: 'نسبة التحويل إلى حجز بعربون', value: `${depositCvr}%`, color: '#f59e0b' },
+              { label: 'نسبة التحويل إلى بيع مكتمل', value: `${salesCvr}%`, color: '#22c55e' },
+            ].map((kpi, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: '#475569' }}>{kpi.label}</span>
+                <span style={{ fontSize: '14px', fontWeight: '800', color: kpi.color }}>{kpi.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* فلاتر التقرير - reminder */}
+        <div style={{ background: '#fefce8', borderRadius: '12px', padding: '16px', border: '1px solid #fde68a' }}>
+          <div style={{ fontSize: '12px', fontWeight: '800', color: '#b45309', marginBottom: '12px' }}>
+            🔍 فلاتر التقرير
+          </div>
+          <div style={{ fontSize: '12px', color: '#78350f', lineHeight: '1.8' }}>
+            <div>📅 الفترة الزمنية • الورشة والفرع</div>
+            <div>👤 المندوب والحملة</div>
+            <div>🚗 نوع السيارة</div>
+            <div style={{ marginTop: '8px', fontSize: '11px', color: '#92400e', fontStyle: 'italic' }}>
+              استخدم الفلاتر أعلاه لتضييق النتائج
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════
 // ANALYTICS DASHBOARD — Helicopter (executive) & Branch Owner
 // ══════════════════════════════════════════════════════════════════
 function AnalyticsDashboard() {
@@ -440,6 +581,9 @@ function AnalyticsDashboard() {
           sub={data.overdue > 0 ? 'تتطلب اتصالاً فورياً' : 'لا متأخرات'}
         />
       </div>
+
+      {/* ── Pipeline Funnel — أعداد الطلبات في رحلة البيع ── */}
+      <PipelineFunnel leads={data.rawLeads || []} theme={theme} />
 
       {/* ── Charts ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
