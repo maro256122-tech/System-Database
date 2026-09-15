@@ -13,7 +13,7 @@ export default function SettingsPage() {
   }, [])
 
   async function addCarModel() {
-    if (!newModel.trim()) return
+    if (!newModel.trim()) return toast.error('يرجى كتابة اسم الموديل أولاً')
     setSaving(true)
     try {
       const { data, error } = await supabase
