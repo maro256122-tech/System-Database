@@ -170,22 +170,24 @@ export default function LeadDetailModal({ leadId, onClose, onUpdate }) {
     setSaving(true)
     try {
       if (responded) {
-        await supabase.from('leads').update({ stage: 'inquiry_replied', contact_responded: true }).eq('id', leadId)
-        await supabase.from('activities').insert({
+        const { error: updateErr } = await supabase.from('leads').update({ stage: 'inquiry_replied', contact_responded: true }).eq('id', leadId)
+        if (updateErr) throw updateErr
+        supabase.from('activities').insert({
           lead_id: leadId, user_id: user.id,
           action_type: 'stage_changed',
           from_stage: 'contacted', to_stage: 'inquiry_replied',
           note: 'العميل رد على التواصل',
-        })
+        }).then(({ error }) => { if (error) console.warn('Activity log:', error.message) })
         toast.success('تم الانتقال لمرحلة "تم الرد" ✅')
       } else {
         if (!followUpDate) return toast.error('يرجى تحديد موعد المتابعة')
-        await supabase.from('leads').update({ contact_responded: false, follow_up_date: followUpDate }).eq('id', leadId)
-        await supabase.from('activities').insert({
+        const { error: updateErr } = await supabase.from('leads').update({ contact_responded: false, follow_up_date: followUpDate }).eq('id', leadId)
+        if (updateErr) throw updateErr
+        supabase.from('activities').insert({
           lead_id: leadId, user_id: user.id,
           action_type: 'contact_no_response',
           note: `لم يرد العميل. موعد المتابعة: ${followUpDate}${followUpNote ? ' — ' + followUpNote : ''}`,
-        })
+        }).then(({ error }) => { if (error) console.warn('Activity log:', error.message) })
         toast.success('تم تسجيل المتابعة ✅')
       }
       setPipelineMode('default'); setFollowUpDate(''); setFollowUpNote('')
@@ -206,29 +208,31 @@ export default function LeadDetailModal({ leadId, onClose, onUpdate }) {
           updateData.deposit_amount = parseFloat(depositAmount)
           updateData.deposit_date = depositDate || new Date().toISOString().split('T')[0]
         }
-        await supabase.from('leads').update(updateData).eq('id', leadId)
-        await supabase.from('activities').insert({
+        const { error: updateErr } = await supabase.from('leads').update(updateData).eq('id', leadId)
+        if (updateErr) throw updateErr
+        supabase.from('activities').insert({
           lead_id: leadId, user_id: user.id,
           action_type: 'stage_changed',
           from_stage: 'visit_booked', to_stage: 'deposit_paid',
           note: depositAmount ? `حضر العميل الزيارة. عربون: ${parseFloat(depositAmount).toLocaleString('ar-SA')} ر.س` : 'حضر العميل الزيارة',
-        })
+        }).then(({ error }) => { if (error) console.warn('Activity log:', error.message) })
         if (depositAmount) {
-          await supabase.from('activities').insert({
+          supabase.from('activities').insert({
             lead_id: leadId, user_id: user.id,
             action_type: 'deposit_recorded',
             note: `مبلغ العربون: ${parseFloat(depositAmount).toLocaleString('ar-SA')} ر.س — التاريخ: ${depositDate || 'اليوم'}`,
-          })
+          }).then(({ error }) => { if (error) console.warn('Activity log:', error.message) })
         }
         toast.success('تم تسجيل الزيارة والانتقال لمرحلة العربون ✅')
       } else {
         if (!rescheduleDate) return toast.error('يرجى تحديد تاريخ إعادة الجدولة')
-        await supabase.from('leads').update({ visit_attended: false, reschedule_date: rescheduleDate }).eq('id', leadId)
-        await supabase.from('activities').insert({
+        const { error: updateErr } = await supabase.from('leads').update({ visit_attended: false, reschedule_date: rescheduleDate }).eq('id', leadId)
+        if (updateErr) throw updateErr
+        supabase.from('activities').insert({
           lead_id: leadId, user_id: user.id,
           action_type: 'visit_no_show',
           note: `العميل لم يحضر الزيارة. إعادة الجدولة: ${rescheduleDate}`,
-        })
+        }).then(({ error }) => { if (error) console.warn('Activity log:', error.message) })
         toast.success('تم تسجيل إعادة الجدولة ✅')
       }
       setPipelineMode('default'); setRescheduleDate(''); setDepositAmount(''); setDepositDate('')
@@ -244,19 +248,20 @@ export default function LeadDetailModal({ leadId, onClose, onUpdate }) {
     if (!depositAmount) return toast.error('يرجى إدخال مبلغ العربون')
     setSaving(true)
     try {
-      await supabase.from('leads').update({
+      const { error: updateErr } = await supabase.from('leads').update({
         deposit_amount: parseFloat(depositAmount),
         deposit_date: depositDate || new Date().toISOString().split('T')[0],
       }).eq('id', leadId)
-      await supabase.from('activities').insert({
+      if (updateErr) throw updateErr
+      supabase.from('activities').insert({
         lead_id: leadId, user_id: user.id,
         action_type: 'deposit_recorded',
         note: `تسجيل/تحديث العربون: ${parseFloat(depositAmount).toLocaleString('ar-SA')} ر.س — التاريخ: ${depositDate || 'اليوم'}`,
-      })
+      }).then(({ error }) => { if (error) console.warn('Activity log:', error.message) })
       toast.success('تم حفظ تفاصيل العربون ✅')
       setEditingDeposit(false); refetch(); onUpdate?.()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error('خطأ في الحفظ: ' + err.message)
     } finally {
       setSaving(false)
     }
