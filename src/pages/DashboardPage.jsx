@@ -4,7 +4,7 @@ import { useDashboardData } from '../hooks/useDashboard'
 import { useLeads } from '../hooks/useLeads'
 import { supabase } from '../lib/supabase'
 import { useEffect } from 'react'
-import { STAGES, ACTIVE_STAGES } from '../lib/constants'
+import { STAGES, ACTIVE_STAGES, SOURCE_OPTIONS } from '../lib/constants'
 import AddLeadModal from '../components/AddLeadModal'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -292,19 +292,65 @@ function RepDashboard() {
 // ══════════════════════════════════════════════════════════════════
 // PIPELINE FUNNEL — أعداد الطلبات في رحلة البيع
 // ══════════════════════════════════════════════════════════════════
-function PipelineFunnel({ leads, theme }) {
+const FUNNEL_SELECT = `*, car_models(id, name), branches(id, name), assigned_rep:user_profiles!assigned_rep_id(id, name)`
+
+function PipelineFunnel({ isHelicopter, branches = [] }) {
+  const { branchId: userBranchId } = useAuth()
+
+  const [filters, setFilters] = useState({
+    branchId: isHelicopter ? '' : (userBranchId || ''),
+    source: '',
+    carModelId: '',
+    dateFrom: '',
+    dateTo: '',
+  })
+  const [leads, setLeads] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // Extract unique car models and reps from loaded leads
+  const carModels = [...new Map(
+    leads.filter(l => l.car_model_id && l.car_models)
+         .map(l => [l.car_model_id, { id: l.car_model_id, name: l.car_models.name }])
+  ).values()]
+
+  const reps = [...new Map(
+    leads.filter(l => l.assigned_rep_id && l.assigned_rep?.name)
+         .map(l => [l.assigned_rep_id, { id: l.assigned_rep_id, name: l.assigned_rep.name }])
+  ).values()]
+
+  function setFilter(k, v) { setFilters(f => ({ ...f, [k]: v })) }
+  const hasFilter = Object.values(filters).some(v => v !== '' && v !== (isHelicopter ? '' : userBranchId))
+
+  // Fetch leads from Supabase with active filters
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      try {
+        let q = supabase.from('leads').select(FUNNEL_SELECT)
+        if (filters.branchId)   q = q.eq('branch_id', filters.branchId)
+        else if (!isHelicopter && userBranchId) q = q.eq('branch_id', userBranchId)
+        if (filters.source)     q = q.eq('source', filters.source)
+        if (filters.carModelId) q = q.eq('car_model_id', filters.carModelId)
+        if (filters.dateFrom)   q = q.gte('created_at', filters.dateFrom)
+        if (filters.dateTo)     q = q.lte('created_at', filters.dateTo + 'T23:59:59')
+        const { data } = await q
+        setLeads(data || [])
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [JSON.stringify(filters), isHelicopter, userBranchId])
+
   const totalLeads = leads.length
 
-  // Cumulative counts: how many leads reached each stage or beyond
   const PIPELINE_STAGES = [
-    { key: 'lead_in',         label: 'الليدز الجديدة',                  desc: 'إجمالي العملاء المضافين',          color: '#6366f1', bg: '#ede9fe' },
-    { key: 'inquiry_replied', label: 'تم الرد على استفساراتهم',          desc: 'خرجوا من مرحلة "عميل جديد"',       color: '#0ea5e9', bg: '#e0f2fe' },
-    { key: 'visit_booked',    label: 'وصلوا لحجز موعد زيارة',            desc: 'تم تحديد موعد المعاينة',           color: '#14b8a6', bg: '#ccfbf1' },
-    { key: 'deposit_paid',    label: 'وصلوا لحجز بعربون',               desc: 'دفعوا عربوناً للحجز',              color: '#f59e0b', bg: '#fef3c7' },
-    { key: 'closed_won',      label: 'عمليات البيع المدفوعة بالكامل',   desc: 'تمت الصفقة وكمل الدفع',            color: '#22c55e', bg: '#dcfce7' },
+    { key: 'lead_in',         label: 'الليدز الجديدة',               desc: 'إجمالي العملاء المضافين',     color: '#6366f1', bg: '#ede9fe' },
+    { key: 'inquiry_replied', label: 'تم الرد على استفساراتهم',       desc: 'ردّ المندوب على استفسارهم',   color: '#0ea5e9', bg: '#e0f2fe' },
+    { key: 'visit_booked',    label: 'وصلوا لحجز موعد زيارة',         desc: 'تم تحديد موعد المعاينة',      color: '#14b8a6', bg: '#ccfbf1' },
+    { key: 'deposit_paid',    label: 'وصلوا لحجز بعربون',             desc: 'دفعوا عربوناً للحجز',         color: '#f59e0b', bg: '#fef3c7' },
+    { key: 'closed_won',      label: 'عمليات البيع المدفوعة بالكامل', desc: 'تمت الصفقة وكمل الدفع',       color: '#22c55e', bg: '#dcfce7' },
   ]
-
-  // Order reflects pipeline progression — count leads AT or PAST each stage
   const stageOrder = ['lead_in', 'contacted', 'inquiry_replied', 'visit_booked', 'deposit_paid', 'closed_won']
   function countFromStage(stageKey) {
     const idx = stageOrder.indexOf(stageKey)
@@ -319,111 +365,155 @@ function PipelineFunnel({ leads, theme }) {
     return { ...s, count, pct, step: i + 1 }
   })
 
-  // Financial conversion rates
-  const visitCount   = rows[2].count
-  const depositCount = rows[3].count
-  const wonCount     = rows[4].count
-  const visitCvr   = totalLeads > 0 ? ((visitCount / totalLeads) * 100).toFixed(1) : 0
-  const depositCvr = totalLeads > 0 ? ((depositCount / totalLeads) * 100).toFixed(1) : 0
-  const salesCvr   = totalLeads > 0 ? ((wonCount / totalLeads) * 100).toFixed(1) : 0
+  const visitCvr   = totalLeads > 0 ? ((rows[2].count / totalLeads) * 100).toFixed(1) : 0
+  const depositCvr = totalLeads > 0 ? ((rows[3].count / totalLeads) * 100).toFixed(1) : 0
+  const salesCvr   = totalLeads > 0 ? ((rows[4].count / totalLeads) * 100).toFixed(1) : 0
+
+  const selectStyle = {
+    border: '1.5px solid #e2e8f0', borderRadius: '8px', padding: '7px 10px',
+    fontFamily: 'Cairo, sans-serif', fontSize: '12px', color: '#374151',
+    background: 'white', width: '100%', boxSizing: 'border-box', outline: 'none',
+  }
 
   return (
     <div className="card" style={{ padding: '24px' }}>
-      <div className="card-header" style={{ marginBottom: '20px' }}>
+      {/* Header */}
+      <div className="card-header" style={{ marginBottom: '16px' }}>
         <div className="card-title">
           <div className="card-title-icon" style={{ background: '#ede9fe' }}>🔻</div>
           أعداد الطلبات في رحلة البيع
         </div>
-        <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-          إجمالي {totalLeads} عميل
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {loading && <div style={{ width: '14px', height: '14px', border: '2px solid #e2e8f0', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />}
+          <span style={{ fontSize: '12px', color: '#94a3b8' }}>{totalLeads} عميل</span>
+        </div>
+      </div>
+
+      {/* ── فلاتر التقرير ── */}
+      <div style={{ background: '#fefce8', borderRadius: '12px', padding: '14px 16px', border: '1px solid #fde68a', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <span style={{ fontSize: '12px', fontWeight: '800', color: '#b45309' }}>🔍 فلاتر التقرير</span>
+          {hasFilter && (
+            <button
+              onClick={() => setFilters({ branchId: isHelicopter ? '' : (userBranchId || ''), source: '', carModelId: '', dateFrom: '', dateTo: '' })}
+              style={{ fontSize: '11px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Cairo, sans-serif', fontWeight: '700' }}
+            >
+              × إعادة التعيين
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+          {/* الفترة الزمنية */}
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: '700', color: '#78350f', marginBottom: '4px' }}>📅 من تاريخ</div>
+            <input type="date" dir="ltr" value={filters.dateFrom}
+              onChange={e => setFilter('dateFrom', e.target.value)}
+              style={selectStyle}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: '700', color: '#78350f', marginBottom: '4px' }}>📅 إلى تاريخ</div>
+            <input type="date" dir="ltr" value={filters.dateTo}
+              onChange={e => setFilter('dateTo', e.target.value)}
+              style={selectStyle}
+            />
+          </div>
+
+          {/* الفرع — للإدارة العليا فقط */}
+          {isHelicopter && (
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: '#78350f', marginBottom: '4px' }}>🏢 الفرع</div>
+              <select value={filters.branchId} onChange={e => setFilter('branchId', e.target.value)} style={selectStyle}>
+                <option value="">كل الفروع</option>
+                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* المصدر */}
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: '700', color: '#78350f', marginBottom: '4px' }}>📡 المصدر</div>
+            <select value={filters.source} onChange={e => setFilter('source', e.target.value)} style={selectStyle}>
+              <option value="">كل المصادر</option>
+              {SOURCE_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+          </div>
+
+          {/* نوع السيارة */}
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: '700', color: '#78350f', marginBottom: '4px' }}>🚗 نوع السيارة</div>
+            <select value={filters.carModelId} onChange={e => setFilter('carModelId', e.target.value)} style={selectStyle}>
+              <option value="">كل الموديلات</option>
+              {carModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </div>
+
+          {/* المندوب */}
+          {reps.length > 0 && (
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: '#78350f', marginBottom: '4px' }}>👤 المندوب</div>
+              <select value={filters.repId || ''} onChange={e => setFilter('repId', e.target.value)} style={selectStyle}>
+                <option value="">كل المندوبين</option>
+                {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Funnel steps */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
         {rows.map((row, i) => {
-          const width = totalLeads > 0 ? Math.max(20, Math.round((row.count / rows[0].count) * 100)) : 20
+          const width = rows[0].count > 0 ? Math.max(8, Math.round((row.count / rows[0].count) * 100)) : 8
           return (
-            <div key={row.key} style={{ position: 'relative' }}>
-              {/* Step bar */}
-              <div style={{
-                background: '#f8fafc',
-                borderRadius: '10px',
-                overflow: 'hidden',
-                border: `1px solid ${row.color}30`,
-              }}>
+            <div key={row.key}>
+              <div style={{ background: '#f8fafc', borderRadius: '10px', overflow: 'hidden', border: `1px solid ${row.color}30` }}>
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '12px 16px',
                   background: `linear-gradient(to left, ${row.bg} ${width}%, white ${width}%)`,
-                  transition: 'background 0.6s ease',
+                  transition: 'background 0.5s ease',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{
-                      width: '28px', height: '28px',
-                      borderRadius: '50%',
-                      background: row.color,
-                      color: 'white',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '12px', fontWeight: '800',
-                      flexShrink: 0,
+                      width: '28px', height: '28px', borderRadius: '50%', background: row.color,
+                      color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '12px', fontWeight: '800', flexShrink: 0,
                     }}>{row.step}</div>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>{row.label}</div>
                       <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '1px' }}>{row.desc}</div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'left', flexShrink: 0 }}>
+                  <div style={{ textAlign: 'center', flexShrink: 0 }}>
                     <div style={{ fontSize: '20px', fontWeight: '800', color: row.color, lineHeight: 1 }}>{row.count}</div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'center' }}>{row.pct}%</div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{row.pct}%</div>
                   </div>
                 </div>
               </div>
-              {/* Arrow connector */}
               {i < rows.length - 1 && (
-                <div style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '14px', lineHeight: '14px', marginTop: '2px' }}>▼</div>
+                <div style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '13px', lineHeight: '16px' }}>▼</div>
               )}
             </div>
           )
         })}
       </div>
 
-      {/* Financial KPIs + Filters hint */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-        {/* الأداء المالي والتحويل */}
-        <div style={{ background: '#f0f9ff', borderRadius: '12px', padding: '16px', border: '1px solid #bae6fd' }}>
-          <div style={{ fontSize: '12px', fontWeight: '800', color: '#0284c7', marginBottom: '12px' }}>
-            📊 الأداء المالي والتحويل
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {[
-              { label: 'نسبة التحويل إلى حجز زيارة', value: `${visitCvr}%`, color: '#14b8a6' },
-              { label: 'نسبة التحويل إلى حجز بعربون', value: `${depositCvr}%`, color: '#f59e0b' },
-              { label: 'نسبة التحويل إلى بيع مكتمل', value: `${salesCvr}%`, color: '#22c55e' },
-            ].map((kpi, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', color: '#475569' }}>{kpi.label}</span>
-                <span style={{ fontSize: '14px', fontWeight: '800', color: kpi.color }}>{kpi.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* فلاتر التقرير - reminder */}
-        <div style={{ background: '#fefce8', borderRadius: '12px', padding: '16px', border: '1px solid #fde68a' }}>
-          <div style={{ fontSize: '12px', fontWeight: '800', color: '#b45309', marginBottom: '12px' }}>
-            🔍 فلاتر التقرير
-          </div>
-          <div style={{ fontSize: '12px', color: '#78350f', lineHeight: '1.8' }}>
-            <div>📅 الفترة الزمنية • الورشة والفرع</div>
-            <div>👤 المندوب والحملة</div>
-            <div>🚗 نوع السيارة</div>
-            <div style={{ marginTop: '8px', fontSize: '11px', color: '#92400e', fontStyle: 'italic' }}>
-              استخدم الفلاتر أعلاه لتضييق النتائج
+      {/* الأداء المالي والتحويل */}
+      <div style={{ background: '#f0f9ff', borderRadius: '12px', padding: '16px', border: '1px solid #bae6fd' }}>
+        <div style={{ fontSize: '12px', fontWeight: '800', color: '#0284c7', marginBottom: '12px' }}>📊 الأداء المالي والتحويل</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', textAlign: 'center' }}>
+          {[
+            { label: 'تحويل إلى زيارة', value: `${visitCvr}%`, color: '#14b8a6', bg: '#ccfbf1' },
+            { label: 'تحويل إلى عربون', value: `${depositCvr}%`, color: '#f59e0b', bg: '#fef3c7' },
+            { label: 'تحويل إلى بيع',   value: `${salesCvr}%`,  color: '#22c55e', bg: '#dcfce7' },
+          ].map((kpi, i) => (
+            <div key={i} style={{ background: kpi.bg, borderRadius: '10px', padding: '12px 8px' }}>
+              <div style={{ fontSize: '18px', fontWeight: '800', color: kpi.color }}>{kpi.value}</div>
+              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>{kpi.label}</div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>
@@ -583,7 +673,7 @@ function AnalyticsDashboard() {
       </div>
 
       {/* ── Pipeline Funnel — أعداد الطلبات في رحلة البيع ── */}
-      <PipelineFunnel leads={data.rawLeads || []} theme={theme} />
+      <PipelineFunnel isHelicopter={isHelicopter} branches={branches} />
 
       {/* ── Charts ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
