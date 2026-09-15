@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { differenceInDays } from 'date-fns'
-import { OVERDUE_DAYS, STAGES } from '../lib/constants'
+import { OVERDUE_DAYS, STAGES, SOURCE_OPTIONS } from '../lib/constants'
 
 export function useDashboardData(filters = {}) {
   const { branchId: userBranchId, isHelicopter } = useAuth()
@@ -102,23 +102,22 @@ export function useDashboardData(filters = {}) {
         { name: 'مرابحة', value: paymentMap.murabaha },
       ].filter(p => p.value > 0)
 
-      // Source breakdown
-      const msgLeads = leads.filter(l => l.source === 'message')
-      const visitLeads = leads.filter(l => l.source === 'visit')
-      const sourceData = [
-        {
-          name: 'رسائل',
-          total: msgLeads.length,
-          won: msgLeads.filter(l => l.stage === 'closed_won').length,
-          cvr: msgLeads.length > 0 ? ((msgLeads.filter(l => l.stage === 'closed_won').length / msgLeads.length) * 100).toFixed(1) : 0,
-        },
-        {
-          name: 'زيارات',
-          total: visitLeads.length,
-          won: visitLeads.filter(l => l.stage === 'closed_won').length,
-          cvr: visitLeads.length > 0 ? ((visitLeads.filter(l => l.stage === 'closed_won').length / visitLeads.length) * 100).toFixed(1) : 0,
-        },
-      ]
+      // Source breakdown — dynamic across all SOURCE_OPTIONS
+      const sourceData = SOURCE_OPTIONS
+        .map(src => {
+          const srcLeads = leads.filter(l => l.source === src.key)
+          if (srcLeads.length === 0) return null
+          const won = srcLeads.filter(l => l.stage === 'closed_won').length
+          return {
+            key: src.key,
+            name: src.label,
+            total: srcLeads.length,
+            won,
+            cvr: ((won / srcLeads.length) * 100).toFixed(1),
+          }
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.total - a.total)
 
       // Weekly trend (last 8 weeks)
       const trendData = buildWeeklyTrend(leads)
@@ -160,6 +159,7 @@ export function useDashboardData(filters = {}) {
         sourceData,
         trendData,
         monthlyData,
+        rawLeads: leads,
       })
     } catch (err) {
       console.error('Dashboard error:', err)
@@ -227,6 +227,6 @@ function getEmptyData() {
     overdue: 0, overdueLeads: [],
     funnelData: [], branchPerformance: [], repLeaderboard: [],
     carModelData: [], paymentData: [], sourceData: [],
-    trendData: [], monthlyData: [],
+    trendData: [], monthlyData: [], rawLeads: [],
   }
 }

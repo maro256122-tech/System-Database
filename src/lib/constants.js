@@ -1,20 +1,28 @@
-// Pipeline stages definition
+// Pipeline stages — 5 active stages + 2 closed
 export const STAGES = [
-  { key: 'lead_in', label: 'عميل جديد', color: '#6366f1', icon: '🆕' },
-  { key: 'contacted', label: 'تم التواصل', color: '#3b82f6', icon: '📞' },
-  { key: 'interested', label: 'مهتم ومؤهل', color: '#0ea5e9', icon: '⭐' },
-  { key: 'showroom_visit', label: 'معاينة / تجربة', color: '#14b8a6', icon: '🚗' },
-  { key: 'quote_sent', label: 'عرض سعر', color: '#f59e0b', icon: '📋' },
-  { key: 'negotiation', label: 'تفاوض', color: '#f97316', icon: '🤝' },
-  { key: 'closed_won', label: 'تم البيع ✅', color: '#22c55e', icon: '🎉' },
-  { key: 'closed_lost', label: 'فقد ❌', color: '#ef4444', icon: '❌' },
+  { key: 'lead_in',        label: 'عميل جديد',              color: '#6366f1', icon: '🆕' },
+  { key: 'contacted',      label: 'جار التواصل',             color: '#3b82f6', icon: '📞' },
+  { key: 'inquiry_replied',label: 'تم الرد على الاستفسار',  color: '#0ea5e9', icon: '✉️' },
+  { key: 'visit_booked',   label: 'حجز موعد زيارة',         color: '#14b8a6', icon: '📅' },
+  { key: 'deposit_paid',   label: 'حجز بعربون',              color: '#f59e0b', icon: '💰' },
+  { key: 'closed_won',     label: 'دفع كامل — بيع',         color: '#22c55e', icon: '✅' },
+  { key: 'closed_lost',    label: 'إلغاء / خسارة',           color: '#ef4444', icon: '❌' },
 ]
+
+export const ACTIVE_STAGES = STAGES.filter(s => !['closed_won', 'closed_lost'].includes(s.key))
 
 export const STAGE_MAP = Object.fromEntries(STAGES.map(s => [s.key, s]))
 
 export const SOURCE_OPTIONS = [
-  { key: 'message', label: 'رسالة' },
-  { key: 'visit', label: 'زيارة' },
+  { key: 'snap',      label: '👻 سناب' },
+  { key: 'instagram', label: '📸 إنستغرام' },
+  { key: 'tiktok',   label: '🎵 تيك توك' },
+  { key: 'google',   label: '🔍 جوجل' },
+  { key: 'whatsapp', label: '💬 واتساب' },
+  { key: 'call',     label: '📞 اتصال' },
+  { key: 'referral', label: '🤝 إحالة' },
+  { key: 'message',  label: '✉️ رسالة' },
+  { key: 'visit',    label: '🚶 زيارة مباشرة' },
 ]
 
 export const PAYMENT_TYPES = [
