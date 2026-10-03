@@ -1,5 +1,5 @@
 -- ============================================================
--- Warcha Pro CRM — Supabase Schema + RLS Policies
+-- 47Branding CRM — Supabase Schema + RLS Policies
 -- ============================================================
 
 -- Enable UUID extension
