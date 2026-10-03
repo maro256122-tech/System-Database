@@ -1,5 +1,5 @@
 -- ============================================================
--- Warcha Pro CRM — Supabase Schema + RLS Policies
+-- 47Branding CRM — Supabase Schema + RLS Policies
 -- ============================================================
 
 -- Enable UUID extension
@@ -39,15 +39,14 @@ CREATE TABLE public.leads (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   branch_id UUID NOT NULL REFERENCES public.branches(id) ON DELETE RESTRICT,
   car_model_id UUID REFERENCES public.car_models(id) ON DELETE SET NULL,
-  source TEXT NOT NULL CHECK (source IN ('message', 'visit')),
+  source TEXT NOT NULL CHECK (source IN ('snap', 'instagram', 'tiktok', 'google', 'whatsapp', 'call', 'referral', 'message', 'visit')),
   payment_type TEXT NOT NULL CHECK (payment_type IN ('cash', 'installment', 'bank_finance', 'murabaha')),
   stage TEXT NOT NULL DEFAULT 'lead_in' CHECK (stage IN (
     'lead_in',
     'contacted',
-    'interested',
-    'showroom_visit',
-    'quote_sent',
-    'negotiation',
+    'inquiry_replied',
+    'visit_booked',
+    'deposit_paid',
     'closed_won',
     'closed_lost'
   )),
@@ -55,6 +54,12 @@ CREATE TABLE public.leads (
   customer_name TEXT NOT NULL,
   customer_phone TEXT,
   lost_reason TEXT,
+  deposit_amount NUMERIC(10,2),
+  deposit_date DATE,
+  visit_attended BOOLEAN,
+  contact_responded BOOLEAN,
+  reschedule_date DATE,
+  follow_up_date DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -71,7 +76,11 @@ CREATE TABLE public.activities (
     'contact_attempt',
     'follow_up',
     'whatsapp_message',
-    'call_made'
+    'call_made',
+    'deposit_recorded',
+    'visit_no_show',
+    'contact_no_response',
+    'visit_rescheduled'
   )),
   note TEXT,
   from_stage TEXT,

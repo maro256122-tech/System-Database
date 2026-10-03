@@ -10,6 +10,7 @@ import BranchesPage from './pages/BranchesPage'
 import SettingsPage from './pages/SettingsPage'
 import OverduePage from './pages/OverduePage'
 import StatsPage from './pages/StatsPage'
+import FinancialPage from './pages/FinancialPage'
 
 function AppContent() {
   const { user, profile, loading } = useAuth()
@@ -26,7 +27,7 @@ function AppContent() {
       }}>
         <div style={{ textAlign: 'center', color: 'white' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚗</div>
-          <div style={{ fontSize: '18px', fontWeight: '700' }}>Warcha Pro</div>
+          <div style={{ fontSize: '18px', fontWeight: '700' }}>47Branding</div>
           <div style={{ fontSize: '14px', opacity: 0.8, marginTop: '4px' }}>جاري التحميل...</div>
         </div>
       </div>
@@ -52,6 +53,7 @@ function AppContent() {
       case 'settings': return <SettingsPage />
       case 'overdue': return <OverduePage />
       case 'stats': return <StatsPage />
+      case 'financial': return <FinancialPage />
       default: return <DashboardPage />
     }
   }

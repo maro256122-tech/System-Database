@@ -70,11 +70,7 @@ export function useLead(leadId) {
       const [leadRes, actRes] = await Promise.all([
         supabase
           .from('leads')
-          .select(`
-            *,
-            branches(id, name),
-            car_models(id, name)
-          `)
+          .select(`*, branches(id, name), car_models(id, name)`)
           .eq('id', leadId)
           .single(),
         supabase
@@ -85,8 +81,23 @@ export function useLead(leadId) {
       ])
 
       if (leadRes.error) throw leadRes.error
-      setLead(leadRes.data)
-      setActivities(actRes.data || [])
+
+      // Collect all user ids to resolve names (activity authors + assigned rep)
+      const actUserIds = (actRes.data || []).map(a => a.user_id)
+      const repId = leadRes.data?.assigned_rep_id
+      const allIds = [...new Set([...actUserIds, repId].filter(Boolean))]
+
+      let userMap = {}
+      if (allIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('user_profiles')
+          .select('id, name')
+          .in('id', allIds)
+        profiles?.forEach(p => { userMap[p.id] = p })
+      }
+
+      setLead({ ...leadRes.data, rep: repId ? (userMap[repId] || null) : null })
+      setActivities((actRes.data || []).map(a => ({ ...a, user: userMap[a.user_id] || null })))
     } catch (err) {
       console.error(err)
     } finally {

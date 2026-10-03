@@ -13,31 +13,32 @@ export default function SettingsPage() {
   }, [])
 
   async function addCarModel() {
-    if (!newModel.trim()) return
+    if (!newModel.trim()) return toast.error('يرجى كتابة اسم الموديل أولاً')
     setSaving(true)
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('car_models')
         .insert({ name: newModel.trim() })
         .select()
         .single()
+      if (error) throw error
       setCarModels(m => [...m, data])
       setNewModel('')
       toast.success('تم إضافة الموديل ✅')
-    } catch {
-      toast.error('حدث خطأ')
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
     } finally {
       setSaving(false)
     }
   }
 
   async function deleteCarModel(id) {
-    try {
-      await supabase.from('car_models').delete().eq('id', id)
+    const { error } = await supabase.from('car_models').delete().eq('id', id)
+    if (error) {
+      toast.error('لا يمكن الحذف — الموديل مرتبط بعملاء')
+    } else {
       setCarModels(m => m.filter(x => x.id !== id))
       toast.success('تم الحذف')
-    } catch {
-      toast.error('لا يمكن الحذف — الموديل مرتبط بعملاء')
     }
   }
 

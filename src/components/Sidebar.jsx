@@ -7,12 +7,14 @@ const NAV_ITEMS = {
     { icon: '◼', label: 'لوحة التحكم', page: 'dashboard', emoji: '📊' },
     { icon: '◼', label: 'جميع الفروع', page: 'branches', emoji: '🏢' },
     { icon: '◼', label: 'جميع العملاء', page: 'leads', emoji: '📋' },
+    { icon: '◼', label: 'الحسابات', page: 'financial', emoji: '💰' },
     { icon: '◼', label: 'التقارير', page: 'reports', emoji: '📈' },
     { icon: '◼', label: 'الإعدادات', page: 'settings', emoji: '⚙️' },
   ],
   branch_owner: [
     { icon: '◼', label: 'لوحة الفرع', page: 'dashboard', emoji: '📊' },
     { icon: '◼', label: 'عملاء الفرع', page: 'leads', emoji: '📋' },
+    { icon: '◼', label: 'الحسابات', page: 'financial', emoji: '💰' },
     { icon: '◼', label: 'التقارير', page: 'reports', emoji: '📈' },
   ],
   rep: [
@@ -60,7 +62,7 @@ export default function Sidebar({ activePage, onNavigate }) {
             boxShadow: '0 4px 12px rgba(37,99,235,0.4)',
           }}>🚗</div>
           <div>
-            <div className="sidebar-logo-title">Warcha Pro</div>
+            <div className="sidebar-logo-title">47Branding</div>
             <div className="sidebar-logo-sub">نظام إدارة العملاء</div>
           </div>
         </div>
